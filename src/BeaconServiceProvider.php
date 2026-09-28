@@ -19,6 +19,7 @@ class BeaconServiceProvider extends ServiceProvider
                 environment: $config['environment'] ?? config('app.env', 'production'),
                 batchSize: $config['batch_size'] ?? 50,
                 sanitizePii: $config['sanitize_pii'] ?? false,
+                sampleRate: $config['sample_rate'] ?? 1.0,
             );
         });
 

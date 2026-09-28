@@ -40,4 +40,15 @@ $invoices = Invoice::where('status', 'pending')->get();
 $span->setTag('rows', $invoices->count())->end();
 ```
 
+## Controlling ingest volume
+
+Every trace is already batched (`BEACON_BATCH_SIZE`) instead of one network call per
+request. In high-traffic services, also set `BEACON_SAMPLE_RATE` (0.0–1.0, default 1.0) to
+trace only a fraction of requests — this is what actually keeps you inside your plan's
+monthly quota. Exceptions are always sent regardless of sampling.
+
+```env
+BEACON_SAMPLE_RATE=0.2
+```
+
 See the full guide at [beacon.trustportidentity.com/help/laravel](https://beacon.trustportidentity.com/help/laravel).

@@ -14,6 +14,7 @@ class BeaconClient
     private string $environment;
     private int $batchSize;
     private bool $sanitizePii;
+    private float $sampleRate;
 
     /** @var array<int, array<string, mixed>> */
     private array $queue = [];
@@ -27,7 +28,8 @@ class BeaconClient
         string $ingestUrl = 'http://localhost:8443',
         string $environment = 'production',
         int $batchSize = 50,
-        bool $sanitizePii = false
+        bool $sanitizePii = false,
+        float $sampleRate = 1.0
     ) {
         $this->apiKey = $apiKey;
         $this->serviceName = $serviceName;
@@ -35,6 +37,19 @@ class BeaconClient
         $this->environment = $environment;
         $this->batchSize = $batchSize;
         $this->sanitizePii = $sanitizePii;
+        $this->sampleRate = ($sampleRate > 0 && $sampleRate <= 1) ? $sampleRate : 1.0;
+    }
+
+    /**
+     * Exceptions are always sent regardless of sampleRate - sampling controls ingest
+     * volume for routine traffic, never error visibility.
+     */
+    private function shouldSample(bool $hasException): bool
+    {
+        if ($hasException || $this->sampleRate >= 1.0) {
+            return true;
+        }
+        return (mt_rand() / mt_getrandmax()) < $this->sampleRate;
     }
 
     public function newSpan(ActiveTrace $trace, string $name, string $type = 'custom', ?array $metadata = null): Span
@@ -48,6 +63,10 @@ class BeaconClient
      */
     public function report(ActiveTrace $trace, array $request, float $durationMs, ?array $exception = null): void
     {
+        if (!$this->shouldSample($exception !== null)) {
+            return;
+        }
+
         if ($this->sanitizePii) {
             if (isset($request['headers']) && is_array($request['headers'])) {
                 $request['headers'] = $this->sanitizeHeaders($request['headers']);
