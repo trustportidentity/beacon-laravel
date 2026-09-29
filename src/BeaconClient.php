@@ -83,11 +83,13 @@ class BeaconClient
             'environment' => $this->environment,
             'runtime' => 'php-' . PHP_VERSION,
             'trace_id' => $trace->traceId,
+            'parent_span' => $trace->parentSpanId,
             'timestamp' => gmdate('Y-m-d\TH:i:s\Z'),
             'duration_ms' => round($durationMs, 2),
             'user' => $trace->user,
             'request' => $request,
             'spans' => $trace->spans,
+            'breadcrumbs' => $trace->breadcrumbs,
             'has_exception' => $exception !== null,
             'exception' => $exception,
         ];

@@ -34,9 +34,61 @@ class BeaconServiceProvider extends ServiceProvider
             __DIR__ . '/../config/beacon.php' => config_path('beacon.php'),
         ], 'beacon-config');
 
+        $this->registerWatchers();
+
         // Flush any queued events when the worker/request finishes.
         $this->app->terminating(function () {
             $this->app->make(BeaconClient::class)->flush();
         });
+    }
+
+    private function registerWatchers(): void
+    {
+        if (!isset($this->app['events'])) {
+            return;
+        }
+
+        $events = $this->app['events'];
+        $config = $this->app['config']->get('beacon.watchers', []);
+
+        // 1. Query Watcher (DB::listen)
+        if ($config['queries'] ?? true) {
+            $queryWatcher = new Watchers\QueryWatcher(
+                $this->app->make(BeaconManager::class),
+                $config
+            );
+            $events->listen(\Illuminate\Database\Events\QueryExecuted::class, [$queryWatcher, 'recordQuery']);
+        }
+
+        // 2. Queue & Background Job Watcher
+        if ($config['jobs'] ?? true) {
+            $jobWatcher = new Watchers\JobWatcher(
+                $this->app->make(BeaconClient::class),
+                $this->app->make(BeaconManager::class)
+            );
+            $events->listen(\Illuminate\Queue\Events\JobProcessing::class, [$jobWatcher, 'recordJobProcessing']);
+            $events->listen(\Illuminate\Queue\Events\JobProcessed::class, [$jobWatcher, 'recordJobProcessed']);
+            $events->listen(\Illuminate\Queue\Events\JobFailed::class, [$jobWatcher, 'recordJobFailed']);
+            $events->listen(\Illuminate\Queue\Events\JobExceptionOccurred::class, [$jobWatcher, 'recordJobFailed']);
+        }
+
+        // 3. Cache Watcher (Redis / Cache operations)
+        if ($config['cache'] ?? true) {
+            $cacheWatcher = new Watchers\CacheWatcher(
+                $this->app->make(BeaconManager::class)
+            );
+            $events->listen(\Illuminate\Cache\Events\CacheHit::class, [$cacheWatcher, 'recordCacheHit']);
+            $events->listen(\Illuminate\Cache\Events\CacheMissed::class, [$cacheWatcher, 'recordCacheMiss']);
+            $events->listen(\Illuminate\Cache\Events\KeyWritten::class, [$cacheWatcher, 'recordKeyWritten']);
+            $events->listen(\Illuminate\Cache\Events\KeyForgotten::class, [$cacheWatcher, 'recordKeyForgotten']);
+        }
+
+        // 4. Log Breadcrumbs Watcher
+        if ($config['logs'] ?? true) {
+            $logWatcher = new Watchers\LogWatcher(
+                $this->app->make(BeaconManager::class)
+            );
+            $events->listen(\Illuminate\Log\Events\MessageLogged::class, [$logWatcher, 'recordLog']);
+        }
     }
 }

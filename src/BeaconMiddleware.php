@@ -23,6 +23,17 @@ class BeaconMiddleware
 
         $exception = null;
         try {
+            // Automatically capture authenticated user context if logged in
+            $user = $request->user();
+            if ($user !== null) {
+                $userId = method_exists($user, 'getAuthIdentifier') ? $user->getAuthIdentifier() : ($user->id ?? '');
+                $trace->identify([
+                    'id' => (string) $userId,
+                    'email' => (string) ($user->email ?? ''),
+                    'username' => (string) ($user->name ?? $user->username ?? $userId),
+                ]);
+            }
+
             $response = $next($request);
             $statusCode = $response->getStatusCode();
         } catch (Throwable $e) {
@@ -44,6 +55,9 @@ class BeaconMiddleware
             $this->manager->setCurrentTrace(null);
             throw $e;
         }
+
+        // Attach outgoing W3C traceparent header to response for distributed continuity
+        $response->headers->set('traceparent', $trace->toTraceparent());
 
         $this->report($request, $trace, $start, $statusCode, $exception);
         $this->manager->setCurrentTrace(null);
