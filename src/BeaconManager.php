@@ -31,6 +31,11 @@ class BeaconManager
         return $this->currentTrace;
     }
 
+    public function getCurrentTrace(): ?ActiveTrace
+    {
+        return $this->currentTrace;
+    }
+
     public function span(string $name, string $type = 'custom', ?array $metadata = null): Span
     {
         $trace = $this->currentTrace ?? new ActiveTrace();
