@@ -14,6 +14,14 @@ return [
     // are always sent regardless of this setting.
     'sample_rate' => (float) env('BEACON_SAMPLE_RATE', 1.0),
 
+    // Register the request-tracing middleware globally on its own (needs BEACON_API_KEY). Turn off if
+    // you register TrustPortIdentity\Beacon\BeaconMiddleware yourself.
+    'auto_middleware' => (bool) env('BEACON_AUTO_MIDDLEWARE', true),
+    'auto_middleware_console' => false,
+
+    // Requests matching these patterns (Request::is) are not traced: health checks and similar noise.
+    'ignore_paths' => array_filter(explode(',', (string) env('BEACON_IGNORE_PATHS', 'up,health,api/health'))),
+
     // Nightwatch-grade automatic event watchers
     'watchers' => [
         'queries' => (bool) env('BEACON_WATCH_QUERIES', true),
