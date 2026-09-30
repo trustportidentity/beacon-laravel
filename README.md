@@ -79,6 +79,26 @@ misses, and log lines as breadcrumbs, plus unhandled exceptions. Health checks (
 traced; change with `BEACON_IGNORE_PATHS`. Set `BEACON_AUTO_MIDDLEWARE=false` if you register
 `TrustPortIdentity\Beacon\BeaconMiddleware` yourself.
 
+### Sampling, noise and privacy
+
+- **Sampling**: `BEACON_SAMPLE_RATE` (0-1) applies to normal requests. Requests that throw are **always** sent.
+  Low-traffic apps should use `1`; a low rate means most requests never appear in the dashboard.
+- **Noisy endpoints** (cron pings, webhooks): exclude with `BEACON_IGNORE_PATHS`, comma separated, `*` wildcard,
+  e.g. `up,health,api/health,api/send_*_mails`.
+- **Always redacted, no setting needed**: `Authorization`, `Cookie`, `Set-Cookie`, `X-Api-Key`, CSRF/XSRF headers,
+  and the value of any query parameter whose name contains `token`, `secret`, `password`, `auth`, `signature`,
+  `session` or is a key (`key`, `cron_key`, `api_key`). Other parameters (`page`, `keyword`) are kept.
+- `BEACON_SANITIZE_PII=true` additionally scrubs card-number-like values from URLs and messages.
+
+### Troubleshooting
+
+| Symptom | Check |
+|---|---|
+| Only a few requests show up | Sample rate below 1, or the path is in `BEACON_IGNORE_PATHS` |
+| Nothing shows up | `BEACON_API_KEY` unset, config cached (`php artisan config:clear`), or the server cannot reach `BEACON_INGEST_URL` |
+| Requests have no user | The app authenticates in a way Laravel's guards do not see; call `Beacon::identify(...)` yourself |
+| Works locally, not in a queue worker | Run `php artisan queue:restart` after changing `.env` |
+
 Telemetry is silent until `BEACON_API_KEY` is set, so the package can ship to every environment safely.
 
 Run the package tests with `composer install && ./vendor/bin/phpunit`.

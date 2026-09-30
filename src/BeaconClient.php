@@ -19,7 +19,13 @@ class BeaconClient
     /** @var array<int, array<string, mixed>> */
     private array $queue = [];
 
-    private const SENSITIVE_HEADERS = ['authorization', 'cookie', 'set-cookie'];
+    private const SENSITIVE_HEADERS = [
+        'authorization', 'proxy-authorization', 'cookie', 'set-cookie',
+        'x-api-key', 'x-xsrf-token', 'x-csrf-token', 'x-auth-token',
+    ];
+    // Parameter names that hold secrets: *token*, *secret*, *password*, api key, auth, and names that ARE a key
+    // (key, cron_key, app-key) or a signature/credential/session id. Harmless names like keyword/page are kept.
+    private const SENSITIVE_PARAM_PATTERN = '/(token|secret|password|passwd|api_?key|auth|signature|credential|passphrase|session|(^|[_\-.])key$|^sig$|^jwt$|^otp$|^pin$|^cvv$)/i';
     private const CARD_NUMBER_PATTERN = '/\b(?:\d[ -]*?){13,19}\b/';
 
     public function __construct(
@@ -67,11 +73,14 @@ class BeaconClient
             return;
         }
 
-        if ($this->sanitizePii) {
-            if (isset($request['headers']) && is_array($request['headers'])) {
-                $request['headers'] = $this->sanitizeHeaders($request['headers']);
-            }
-            if (isset($request['url'])) {
+        // Secrets never leave the app: sensitive headers and query parameters are ALWAYS redacted.
+        // sanitizePii additionally scrubs card-number-like values.
+        if (isset($request['headers']) && is_array($request['headers'])) {
+            $request['headers'] = $this->sanitizeHeaders($request['headers']);
+        }
+        if (isset($request['url']) && is_string($request['url'])) {
+            $request['url'] = $this->redactQuery($request['url']);
+            if ($this->sanitizePii) {
                 $request['url'] = $this->sanitizeString($request['url']);
             }
         }
@@ -138,6 +147,30 @@ class BeaconClient
             $out[$k] = in_array(strtolower($k), self::SENSITIVE_HEADERS, true) ? '[redacted]' : $v;
         }
         return $out;
+    }
+
+    /** Redacts the values of sensitive query parameters (cron_key, token, signature, ...). */
+    private function redactQuery(string $url): string
+    {
+        $pos = strpos($url, '?');
+        if ($pos === false) {
+            return $url;
+        }
+        $fragment = '';
+        $hash = strpos($url, '#', $pos);
+        if ($hash !== false) {
+            $fragment = substr($url, $hash);
+            $url = substr($url, 0, $hash);
+        }
+        $parts = explode('&', substr($url, $pos + 1));
+        foreach ($parts as $i => $part) {
+            $eq = strpos($part, '=');
+            $name = urldecode($eq === false ? $part : substr($part, 0, $eq));
+            if ($eq !== false && preg_match(self::SENSITIVE_PARAM_PATTERN, $name) === 1) {
+                $parts[$i] = substr($part, 0, $eq) . '=[Filtered]';
+            }
+        }
+        return substr($url, 0, $pos + 1) . implode('&', $parts) . $fragment;
     }
 
     private function sanitizeString(string $value): string
