@@ -122,6 +122,59 @@ class MiddlewareTest extends TestCase
         $this->assertSame('7', $fake->reports[0]['trace']->user['id']);
     }
 
+    public function test_exception_turned_into_a_500_by_laravel_is_still_captured_with_user(): void
+    {
+        $fake = $this->fake();
+        FakeAuth::$user = (object) ['id' => 9, 'name' => 'B', 'email' => 'b@x.ng'];
+        Route::middleware(FakeAuth::class)->get('/api/explode', function () {
+            throw new \LogicException('db gone');
+        });
+
+        // Normal exception handling: Laravel renders a 500 inside the pipeline, the middleware never sees a throw.
+        $this->get('/api/explode')->assertStatus(500);
+
+        $this->assertCount(1, $fake->reports);
+        $this->assertSame(500, $fake->reports[0]['request']['status_code']);
+        $this->assertSame('LogicException', $fake->reports[0]['exception']['type']);
+        $this->assertSame('db gone', $fake->reports[0]['exception']['message']);
+        $this->assertSame('9', $fake->reports[0]['trace']->user['id']);
+    }
+
+    public function test_ignored_exceptions_like_404_and_validation_are_not_reported_as_errors(): void
+    {
+        $fake = $this->fake();
+        Route::get('/nf', fn () => abort(404));
+        Route::get('/val', fn () => throw \Illuminate\Validation\ValidationException::withMessages(['a' => 'bad']));
+
+        $this->get('/nf')->assertNotFound();
+        $this->get('/val')->assertStatus(302);
+
+        foreach ($fake->reports as $r) {
+            $this->assertNull($r['exception']);
+        }
+    }
+
+    public function test_exception_outside_a_request_is_sent_as_its_own_trace(): void
+    {
+        $fake = $this->fake();
+        $this->app->make(BeaconManager::class)->recordException(new \RuntimeException('cron failed'));
+
+        $this->assertCount(1, $fake->reports);
+        $this->assertSame('CLI', $fake->reports[0]['request']['method']);
+        $this->assertSame('cron failed', $fake->reports[0]['exception']['message']);
+    }
+
+    public function test_fatal_errors_are_reported_and_flushed(): void
+    {
+        $fake = $this->fake();
+        \TrustPortIdentity\Beacon\FatalErrorHandler::report($fake, $this->app->make(BeaconManager::class), [
+            'type' => E_ERROR, 'message' => 'Allowed memory size of 134217728 bytes exhausted', 'file' => '/app/x.php', 'line' => 12,
+        ]);
+
+        $this->assertSame('FatalError', $fake->reports[0]['exception']['type']);
+        $this->assertStringContainsString('memory size', $fake->reports[0]['exception']['message']);
+    }
+
     public function test_health_checks_are_not_traced(): void
     {
         $fake = $this->fake();

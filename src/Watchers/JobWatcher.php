@@ -97,19 +97,7 @@ class JobWatcher
 
         $trace = $this->manager->getCurrentTrace() ?? new ActiveTrace();
 
-        $exceptionData = [
-            'type' => get_class($e),
-            'message' => $e->getMessage(),
-            'handled' => false,
-            'stacktrace' => array_map(
-                fn (array $frame) => [
-                    'file' => $frame['file'] ?? 'unknown',
-                    'line' => $frame['line'] ?? 0,
-                    'function' => $frame['function'] ?? 'unknown',
-                ],
-                $e->getTrace()
-            ),
-        ];
+        $exceptionData = BeaconManager::describe($e);
 
         $trace->addSpan([
             'type' => 'job',

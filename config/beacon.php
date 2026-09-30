@@ -19,6 +19,11 @@ return [
     'auto_middleware' => (bool) env('BEACON_AUTO_MIDDLEWARE', true),
     'auto_middleware_console' => false,
 
+    // Report every exception Laravel's handler reports (web, queue, artisan) and PHP fatal errors
+    // (memory exhausted, max execution time). Exceptions the app ignores (404, validation) stay ignored.
+    'capture_exceptions' => (bool) env('BEACON_CAPTURE_EXCEPTIONS', true),
+    'capture_fatals' => (bool) env('BEACON_CAPTURE_FATALS', true),
+
     // Requests matching these patterns (Request::is) are not traced: health checks and similar noise.
     'ignore_paths' => array_filter(explode(',', (string) env('BEACON_IGNORE_PATHS', 'up,health,api/health'))),
 

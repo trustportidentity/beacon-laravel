@@ -47,4 +47,47 @@ class BeaconManager
     {
         $this->currentTrace?->identify($user);
     }
+
+    /** @return array<string, mixed> */
+    public static function describe(\Throwable $e, bool $handled = false): array
+    {
+        return [
+            'type' => get_class($e),
+            'message' => $e->getMessage(),
+            'handled' => $handled,
+            'stacktrace' => array_map(
+                fn (array $frame) => [
+                    'file' => $frame['file'] ?? 'unknown',
+                    'line' => $frame['line'] ?? 0,
+                    'function' => $frame['function'] ?? 'unknown',
+                ],
+                array_slice([['file' => $e->getFile(), 'line' => $e->getLine()]] + $e->getTrace(), 0, 50)
+            ),
+        ];
+    }
+
+    /**
+     * Called for every exception Laravel's handler decides to report (so validation/404/auth exceptions the
+     * app ignores stay ignored). With an active request/job trace the exception is attached to that trace;
+     * otherwise (artisan, scheduler, console) it is sent as its own trace so it is never lost.
+     */
+    public function recordException(\Throwable $e): void
+    {
+        try {
+            $trace = $this->currentTrace;
+            if ($trace !== null) {
+                $trace->exception ??= self::describe($e);
+                return;
+            }
+            $trace = new ActiveTrace();
+            $this->client->report($trace, [
+                'method' => 'CLI',
+                'route' => 'console:' . basename((string) ($_SERVER['argv'][1] ?? 'script')),
+                'url' => 'cli://' . (string) ($_SERVER['argv'][1] ?? 'script'),
+                'status_code' => 500,
+            ], 0.0, self::describe($e));
+        } catch (\Throwable) {
+            // telemetry must never break the host app
+        }
+    }
 }
