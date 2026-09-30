@@ -129,7 +129,7 @@ class BeaconClient
             CURLOPT_HTTPHEADER => [
                 'Content-Type: application/json',
                 'X-Beacon-Key: ' . $this->apiKey,
-                'User-Agent: trustportidentity-beacon-laravel/1.0',
+                'User-Agent: trustportidentity-beacon-laravel/1.2',
             ],
             CURLOPT_TIMEOUT => 3,
             CURLOPT_RETURNTRANSFER => true,

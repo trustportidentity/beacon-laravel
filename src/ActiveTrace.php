@@ -14,6 +14,8 @@ class ActiveTrace
     public array $breadcrumbs = [];
     /** @var array<string, mixed>|null */
     public ?array $user = null;
+    /** First exception reported by Laravel's handler while this trace was active. @var array<string, mixed>|null */
+    public ?array $exception = null;
     /** @var array<string, int> */
     public array $queryFingerprints = [];
     /** @var array<string, int> */

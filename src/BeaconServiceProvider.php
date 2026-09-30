@@ -36,6 +36,7 @@ class BeaconServiceProvider extends ServiceProvider
 
         $this->registerWatchers();
         $this->registerMiddleware();
+        $this->registerExceptionCapture();
 
         // Flush any queued events when the worker/request finishes.
         $this->app->terminating(function () {
@@ -66,6 +67,37 @@ class BeaconServiceProvider extends ServiceProvider
             return;
         }
         $kernel->pushMiddleware(BeaconMiddleware::class);
+    }
+
+    /**
+     * Captures every exception Laravel reports (web, queue, artisan) and PHP fatals. Does nothing without
+     * an API key. Set BEACON_CAPTURE_EXCEPTIONS=false / BEACON_CAPTURE_FATALS=false to opt out.
+     */
+    private function registerExceptionCapture(): void
+    {
+        $config = $this->app['config']->get('beacon', []);
+        if (empty($config['api_key'])) {
+            return;
+        }
+        if ($config['capture_exceptions'] ?? true) {
+            try {
+                $handler = $this->app->make(\Illuminate\Contracts\Debug\ExceptionHandler::class);
+                if (method_exists($handler, 'reportable')) {
+                    $app = $this->app;
+                    $handler->reportable(function (\Throwable $e) use ($app) {
+                        $app->make(BeaconManager::class)->recordException($e);
+                    });
+                }
+            } catch (\Throwable) {
+                // never break boot
+            }
+        }
+        if (($config['capture_fatals'] ?? true) && !$this->app->runningUnitTests()) {
+            FatalErrorHandler::register(
+                $this->app->make(BeaconClient::class),
+                $this->app->make(BeaconManager::class)
+            );
+        }
     }
 
     private function registerWatchers(): void

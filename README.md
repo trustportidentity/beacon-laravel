@@ -79,6 +79,19 @@ misses, and log lines as breadcrumbs, plus unhandled exceptions. Health checks (
 traced; change with `BEACON_IGNORE_PATHS`. Set `BEACON_AUTO_MIDDLEWARE=false` if you register
 `TrustPortIdentity\Beacon\BeaconMiddleware` yourself.
 
+### Errors: what is captured (v1.2+)
+
+| Situation | Captured as |
+|---|---|
+| Exception in a web request (including ones Laravel turns into a 500 page/JSON) | The request trace, with the user, route and stack trace |
+| Exception in a queue job | A `QUEUE` trace with the failure |
+| Exception in artisan / scheduler / console code | A `CLI` trace |
+| Exceptions you `report($e)` or that Laravel logs | Same as above, marked handled |
+| PHP fatals: memory exhausted, max execution time, parse errors | A `FatalError` trace, flushed from a shutdown handler |
+| 404, validation, auth exceptions Laravel does not report | Not sent (no noise) |
+
+Opt out with `BEACON_CAPTURE_EXCEPTIONS=false` / `BEACON_CAPTURE_FATALS=false`. Errors are never sampled away.
+
 ### Sampling, noise and privacy
 
 - **Sampling**: `BEACON_SAMPLE_RATE` (0-1) applies to normal requests. Requests that throw are **always** sent.
@@ -96,6 +109,7 @@ traced; change with `BEACON_IGNORE_PATHS`. Set `BEACON_AUTO_MIDDLEWARE=false` if
 |---|---|
 | Only a few requests show up | Sample rate below 1, or the path is in `BEACON_IGNORE_PATHS` |
 | Nothing shows up | `BEACON_API_KEY` unset, config cached (`php artisan config:clear`), or the server cannot reach `BEACON_INGEST_URL` |
+| A fatal/exception is missing | Upgrade to `^1.2`; fatals need `BEACON_CAPTURE_FATALS` not `false` |
 | Requests have no user | The app authenticates in a way Laravel's guards do not see; call `Beacon::identify(...)` yourself |
 | Works locally, not in a queue worker | Run `php artisan queue:restart` after changing `.env` |
 

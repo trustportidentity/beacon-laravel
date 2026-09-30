@@ -54,7 +54,9 @@ class BeaconMiddleware
         // Attach outgoing W3C traceparent header to response for distributed continuity
         $response->headers->set('traceparent', $trace->toTraceparent());
 
-        $this->report($request, $trace, $start, $response->getStatusCode(), null);
+        // Laravel turns exceptions into 500 responses inside the pipeline, so they never reach the catch above;
+        // the handler hook (BeaconServiceProvider) stored them on the trace.
+        $this->report($request, $trace, $start, $response->getStatusCode(), $trace->exception);
         $this->manager->setCurrentTrace(null);
 
         return $response;
