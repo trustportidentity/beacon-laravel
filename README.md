@@ -57,12 +57,8 @@ See the full guide at [beacon.trustportidentity.com/help/laravel](https://beacon
 
 Beacon registers itself the way Nightwatch does: install the package, set the env vars, done.
 
-1. Until the package is on Packagist, add the repository to `composer.json`:
-   ```json
-   "repositories": [{ "type": "vcs", "url": "https://github.com/trustportidentity/beacon-laravel" }]
-   ```
-2. `composer remove laravel/nightwatch` then `composer require trustportidentity/beacon-laravel:^1.1`
-3. In `.env`, replace the `NIGHTWATCH_*` variables with:
+1. `composer remove laravel/nightwatch` then `composer require trustportidentity/beacon-laravel:^1.2`
+2. In `.env`, replace the `NIGHTWATCH_*` variables with:
    ```
    BEACON_API_KEY=tb_live_...           # your workspace key from Beacon
    BEACON_INGEST_URL=https://beacon-api.trustportidentity.com
@@ -70,8 +66,8 @@ Beacon registers itself the way Nightwatch does: install the package, set the en
    BEACON_ENVIRONMENT=production        # label in Beacon (production/staging/local)
    BEACON_SAMPLE_RATE=1                 # 0-1; replaces NIGHTWATCH_REQUEST_SAMPLE_RATE
    ```
-4. Stop the Nightwatch agent (`php artisan nightwatch:agent`): Beacon has no agent process.
-5. `php artisan config:clear` and `php artisan queue:restart`.
+3. Stop the Nightwatch agent (`php artisan nightwatch:agent`): Beacon has no agent process.
+4. `php artisan config:clear` and `php artisan queue:restart`.
 
 What you get with no code changes: every HTTP request (route, status, redacted headers, the signed-in user from any
 guard including Sanctum), database queries with slow-query / N+1 / duplicate detection, queue jobs, cache hits and
