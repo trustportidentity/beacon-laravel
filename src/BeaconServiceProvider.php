@@ -35,11 +35,37 @@ class BeaconServiceProvider extends ServiceProvider
         ], 'beacon-config');
 
         $this->registerWatchers();
+        $this->registerMiddleware();
 
         // Flush any queued events when the worker/request finishes.
         $this->app->terminating(function () {
             $this->app->make(BeaconClient::class)->flush();
         });
+    }
+
+    /**
+     * Adds the request-tracing middleware to the global HTTP stack automatically (like Nightwatch),
+     * so installing the package and setting BEACON_API_KEY is all an app needs. Does nothing
+     * without an API key, in the console (queue workers have their own watcher), or when the app
+     * already registered BeaconMiddleware itself.
+     */
+    private function registerMiddleware(): void
+    {
+        $config = $this->app['config']->get('beacon', []);
+        if (!($config['auto_middleware'] ?? true) || empty($config['api_key'])) {
+            return;
+        }
+        if ($this->app->runningInConsole() && !($config['auto_middleware_console'] ?? false)) {
+            return;
+        }
+        $kernel = $this->app->make(\Illuminate\Contracts\Http\Kernel::class);
+        if (!method_exists($kernel, 'pushMiddleware')) {
+            return;
+        }
+        if (method_exists($kernel, 'hasMiddleware') && $kernel->hasMiddleware(BeaconMiddleware::class)) {
+            return;
+        }
+        $kernel->pushMiddleware(BeaconMiddleware::class);
     }
 
     private function registerWatchers(): void
