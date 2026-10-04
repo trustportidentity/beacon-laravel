@@ -15,6 +15,7 @@ class BeaconClient
     private int $batchSize;
     private bool $sanitizePii;
     private float $sampleRate;
+    private int $alwaysSendFromStatus;
 
     /** @var array<int, array<string, mixed>> */
     private array $queue = [];
@@ -35,7 +36,8 @@ class BeaconClient
         string $environment = 'production',
         int $batchSize = 50,
         bool $sanitizePii = false,
-        float $sampleRate = 1.0
+        float $sampleRate = 1.0,
+        int $alwaysSendFromStatus = 500
     ) {
         $this->apiKey = $apiKey;
         $this->serviceName = $serviceName;
@@ -44,15 +46,16 @@ class BeaconClient
         $this->batchSize = $batchSize;
         $this->sanitizePii = $sanitizePii;
         $this->sampleRate = ($sampleRate > 0 && $sampleRate <= 1) ? $sampleRate : 1.0;
+        $this->alwaysSendFromStatus = $alwaysSendFromStatus > 0 ? $alwaysSendFromStatus : 500;
     }
 
     /**
-     * Exceptions are always sent regardless of sampleRate - sampling controls ingest
-     * volume for routine traffic, never error visibility.
+     * Exceptions and error responses (status >= alwaysSendFromStatus, 500 by default) are always sent
+     * regardless of sampleRate - sampling controls ingest volume for routine traffic, never error visibility.
      */
-    private function shouldSample(bool $hasException): bool
+    private function shouldSample(bool $hasException, int $statusCode = 0): bool
     {
-        if ($hasException || $this->sampleRate >= 1.0) {
+        if ($hasException || $statusCode >= $this->alwaysSendFromStatus || $this->sampleRate >= 1.0) {
             return true;
         }
         return (mt_rand() / mt_getrandmax()) < $this->sampleRate;
@@ -69,7 +72,7 @@ class BeaconClient
      */
     public function report(ActiveTrace $trace, array $request, float $durationMs, ?array $exception = null): void
     {
-        if (!$this->shouldSample($exception !== null)) {
+        if (!$this->shouldSample($exception !== null, (int) ($request['status_code'] ?? 0))) {
             return;
         }
 
