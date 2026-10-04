@@ -20,6 +20,7 @@ class BeaconServiceProvider extends ServiceProvider
                 batchSize: $config['batch_size'] ?? 50,
                 sanitizePii: $config['sanitize_pii'] ?? false,
                 sampleRate: $config['sample_rate'] ?? 1.0,
+                alwaysSendFromStatus: $config['always_send_from_status'] ?? 500,
             );
         });
 

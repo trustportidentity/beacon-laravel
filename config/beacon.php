@@ -14,6 +14,10 @@ return [
     // are always sent regardless of this setting.
     'sample_rate' => (float) env('BEACON_SAMPLE_RATE', 1.0),
 
+    // Responses with this status or higher are always sent, whatever sample_rate says. 500 keeps every
+    // server error; set 400 to also keep every client error (401, 404, 422...) on public APIs.
+    'always_send_from_status' => (int) env('BEACON_ALWAYS_SEND_FROM_STATUS', 500),
+
     // Register the request-tracing middleware globally on its own (needs BEACON_API_KEY). Turn off if
     // you register TrustPortIdentity\Beacon\BeaconMiddleware yourself.
     'auto_middleware' => (bool) env('BEACON_AUTO_MIDDLEWARE', true),

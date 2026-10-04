@@ -55,11 +55,53 @@ class BeaconMiddleware
         $response->headers->set('traceparent', $trace->toTraceparent());
 
         // Laravel turns exceptions into 500 responses inside the pipeline, so they never reach the catch above;
-        // the handler hook (BeaconServiceProvider) stored them on the trace.
-        $this->report($request, $trace, $start, $response->getStatusCode(), $trace->exception);
+        // the handler hook (BeaconServiceProvider) stored them on the trace. A 5xx the app returned on purpose
+        // (abort(500), response()->json(..., 503)) has no exception, so describe it from the response.
+        $status = $response->getStatusCode();
+        $exception = $trace->exception ?? ($status >= 500 ? $this->serverErrorException($request, $response) : null);
+        $this->report($request, $trace, $start, $status, $exception);
         $this->manager->setCurrentTrace(null);
 
         return $response;
+    }
+
+    /**
+     * Describes a 5xx response that carried no exception. The type names the status and the error message the
+     * app sent back, so each distinct failure groups into its own issue.
+     *
+     * @return array<string, mixed>
+     */
+    private function serverErrorException(Request $request, Response $response): array
+    {
+        $status = $response->getStatusCode();
+        $message = '';
+        try {
+            $body = $response->getContent();
+            if (is_string($body) && $body !== '') {
+                $body = substr($body, 0, 2048);
+                $json = json_decode($body, true);
+                if (is_array($json)) {
+                    foreach (['message', 'error', 'detail', 'title'] as $key) {
+                        if (isset($json[$key]) && is_string($json[$key]) && $json[$key] !== '') {
+                            $message = $json[$key];
+                            break;
+                        }
+                    }
+                } elseif (!str_contains(strtolower($response->headers->get('Content-Type', '')), 'html')) {
+                    $message = trim($body);
+                }
+            }
+        } catch (Throwable) {
+            // Streamed and binary responses have no readable body.
+        }
+        $message = mb_substr($message, 0, 500);
+        $type = "HTTP {$status}" . ($message !== '' ? ': ' . mb_substr($message, 0, 120) : '');
+        return [
+            'type' => $type,
+            'message' => "{$request->method()} /{$request->path()} responded {$status}" . ($message !== '' ? ": {$message}" : ''),
+            'handled' => true,
+            'stacktrace' => [],
+        ];
     }
 
     /** Health checks and similar noise are not traced (config: beacon.ignore_paths). */

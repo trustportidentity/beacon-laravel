@@ -45,7 +45,8 @@ $span->setTag('rows', $invoices->count())->end();
 Every trace is already batched (`BEACON_BATCH_SIZE`) instead of one network call per
 request. In high-traffic services, also set `BEACON_SAMPLE_RATE` (0.0–1.0, default 1.0) to
 trace only a fraction of requests — this is what actually keeps you inside your plan's
-monthly quota. Exceptions are always sent regardless of sampling.
+monthly quota. Exceptions and 5xx responses are always sent regardless of sampling; set
+`BEACON_ALWAYS_SEND_FROM_STATUS=400` to also keep every 4xx (useful for public APIs).
 
 ```env
 BEACON_SAMPLE_RATE=0.2
@@ -90,7 +91,7 @@ Opt out with `BEACON_CAPTURE_EXCEPTIONS=false` / `BEACON_CAPTURE_FATALS=false`. 
 
 ### Sampling, noise and privacy
 
-- **Sampling**: `BEACON_SAMPLE_RATE` (0-1) applies to normal requests. Requests that throw are **always** sent.
+- **Sampling**: `BEACON_SAMPLE_RATE` (0-1) applies to normal requests. Requests that throw, and every response with status ≥ `BEACON_ALWAYS_SEND_FROM_STATUS` (default 500), are **always** sent. A 5xx returned without an exception is reported as `HTTP <status>: <message from the response>`.
   Low-traffic apps should use `1`; a low rate means most requests never appear in the dashboard.
 - **Noisy endpoints** (cron pings, webhooks): exclude with `BEACON_IGNORE_PATHS`, comma separated, `*` wildcard,
   e.g. `up,health,api/health,api/send_*_mails`.

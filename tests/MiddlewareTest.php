@@ -154,6 +154,22 @@ class MiddlewareTest extends TestCase
         }
     }
 
+    public function test_a_5xx_returned_without_an_exception_is_reported_with_its_message(): void
+    {
+        $fake = $this->fake();
+        Route::get('/api/public/pay', fn () => response()->json(['message' => 'Payment gateway unavailable'], 503));
+        Route::get('/api/public/boom', fn () => abort(500));
+
+        $this->get('/api/public/pay')->assertStatus(503);
+        $this->get('/api/public/boom')->assertStatus(500);
+
+        $this->assertCount(2, $fake->reports);
+        $this->assertSame('HTTP 503: Payment gateway unavailable', $fake->reports[0]['exception']['type']);
+        $this->assertSame('GET /api/public/pay responded 503: Payment gateway unavailable', $fake->reports[0]['exception']['message']);
+        $this->assertTrue($fake->reports[0]['exception']['handled']);
+        $this->assertStringStartsWith('HTTP 500', $fake->reports[1]['exception']['type']);
+    }
+
     public function test_exception_outside_a_request_is_sent_as_its_own_trace(): void
     {
         $fake = $this->fake();
